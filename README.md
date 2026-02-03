@@ -3,124 +3,133 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI ES Assistant</title>
+  <title>Wake-word AI ES</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: linear-gradient(120deg, #f0f4f8, #d9e2ec);
+      background: #f0f4f8;
       display: flex;
       justify-content: center;
       align-items: center;
       height: 100vh;
+      margin: 0;
     }
-    #chatBox {
+    .chat-container {
       width: 400px;
       height: 600px;
-      border-radius: 15px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.2);
-      background-color: #ffffff;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.15);
       display: flex;
       flex-direction: column;
       overflow: hidden;
     }
-    #messages {
+    .chat-header {
+      background: #0288d1;
+      color: white;
+      padding: 15px;
+      font-weight: bold;
+      text-align: center;
+    }
+    .messages {
       flex: 1;
       padding: 10px;
       overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
     .message {
-      margin: 5px 0;
-      padding: 8px 12px;
-      border-radius: 10px;
       max-width: 80%;
+      padding: 10px;
+      border-radius: 10px;
       word-wrap: break-word;
     }
-    .user { background-color: #d0ebff; align-self: flex-end; }
-    .ai { background-color: #e0f7fa; align-self: flex-start; }
-    #inputBox {
-      display: flex;
-      border-top: 1px solid #ccc;
-    }
-    #inputBox input {
-      flex: 1;
-      padding: 10px;
-      border: none;
-      outline: none;
-    }
-    #inputBox button {
-      padding: 10px;
-      border: none;
-      background-color: #0288d1;
-      color: white;
-      cursor: pointer;
-    }
+    .user-message { background: #dcf8c6; align-self: flex-end; }
+    .ai-message { background: #f1f0f0; align-self: flex-start; }
+    .info { text-align: center; padding: 5px; font-size: 12px; color: #555; }
   </style>
 </head>
 <body>
-
-<div id="chatBox">
-  <div id="messages"></div>
-  <div id="inputBox">
-    <input type="text" id="userInput" placeholder="Say something to ES...">
-    <button onclick="sendMessage()">Send</button>
+  <div class="chat-container">
+    <div class="chat-header">Wake-word AI ES</div>
+    <div class="messages" id="messages"></div>
+    <div class="info">Say "Hey ES" to wake me up.</div>
   </div>
-</div>
 
-<script>
-  const messages = document.getElementById('messages');
+  <script>
+    const messagesContainer = document.getElementById('messages');
+    let recognition;
+    let listening = false;
 
-  function appendMessage(text, sender) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    div.className = 'message ' + sender;
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
-    if(sender === 'ai'){
-      speak(text);
-    }
-  }
-
-  function speak(text){
-    const msg = new SpeechSynthesisUtterance();
-    msg.text = text;
-    msg.voice = speechSynthesis.getVoices()[0]; // Jarvis-like voice
-    msg.rate = 1;
-    msg.pitch = 1;
-    speechSynthesis.speak(msg);
-  }
-
-  function generateAIResponse(input){
-    // Simple logic for demo, can expand to use AI API later
-    let response = "";
-    const lower = input.toLowerCase();
-    if(lower.includes("hello") || lower.includes("hi")){
-      response = "ES: Hello! I am here to help you. Bye";
-    } else if(lower.includes("stress") || lower.includes("tired")){
-      response = "ES: Take a deep breath, focus on 3 slow breaths, everything will be fine. Bye";
-    } else if(lower.includes("motivation")){
-      response = "ES: Remember, small steps every day lead to big achievements. Bye";
-    } else if(lower.includes("bye")){
-      response = "ES: Bye! Talk to you later!";
+    // Setup speech recognition
+    if('webkitSpeechRecognition' in window){
+      recognition = new webkitSpeechRecognition();
+    } else if('SpeechRecognition' in window){
+      recognition = new SpeechRecognition();
     } else {
-      response = "ES: I am listening... Tell me more. Bye";
+      alert("Your browser does not support voice recognition");
     }
-    return response;
-  }
 
-  function sendMessage(){
-    const input = document.getElementById('userInput').value;
-    if(!input) return;
-    appendMessage(input, 'user');
-    document.getElementById('userInput').value = '';
-    const aiResponse = generateAIResponse(input);
-    setTimeout(() => appendMessage(aiResponse, 'ai'), 500);
-  }
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
 
-  // Optional: Press Enter to send message
-  document.getElementById('userInput').addEventListener('keypress', function(e){
-    if(e.key === 'Enter') sendMessage();
-  });
-</script>
+    recognition.onresult = function(event){
+      const transcript = event.results[event.results.length-1][0].transcript.trim();
+      console.log("Heard: ", transcript);
 
+      if(!listening && transcript.toLowerCase().includes("hey es")){
+        listening = true;
+        appendMessage("Hey! ES is awake and ready to help you.", 'ai');
+      } 
+      else if(listening){
+        appendMessage(transcript, 'user');
+        generateAIResponse(transcript);
+      }
+    }
+
+    recognition.onerror = function(event){
+      console.log("Error: " + event.error);
+    }
+
+    recognition.onend = function(){
+      recognition.start(); // restart listening continuously
+    }
+
+    recognition.start();
+
+    function appendMessage(text, sender){
+      const msgDiv = document.createElement('div');
+      msgDiv.textContent = text;
+      msgDiv.className = 'message ' + (sender==='user' ? 'user-message' : 'ai-message');
+      messagesContainer.appendChild(msgDiv);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      if(sender==='ai') speak(text);
+    }
+
+    function speak(text){
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1;
+      utterance.pitch = 1;
+      speechSynthesis.speak(utterance);
+    }
+
+    function generateAIResponse(input){
+      const lower = input.toLowerCase();
+      let response = "";
+      if(lower.includes("stress") || lower.includes("tired")){
+        response = "ES: Take a deep breath. I am here to calm you.";
+      } else if(lower.includes("motivation")){
+        response = "ES: Remember, every small step counts!";
+      } else if(lower.includes("bye")){
+        response = "ES: Goodbye! Talk later.";
+        listening = false; // stop active session
+      } else {
+        response = "ES: I am listening, tell me more.";
+      }
+      setTimeout(() => appendMessage(response, 'ai'), 500);
+    }
+  </script>
 </body>
 </html>
